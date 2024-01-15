@@ -41,7 +41,7 @@ class Inter:
             f.write(prv)
             self.__prv_path = f.name
     
-    def get_token(self, scopes=["pix.read", "cob.read", "cob.write"]):
+    def get_token(self, scopes=["extrato.read", "pix.read", "pix.write", "cob.read", "cob.write"]):
         self.__oauth = requests.post(
             url=self.__url + "/oauth/v2/token", 
             data={
@@ -68,13 +68,13 @@ class Inter:
                 self.__prv_path
             ))
         r.raise_for_status()
-        return r.text
+        return r.json()
     
     def get_balance(self):
         return self.call("GET", "/banking/v2/saldo")
 
-    def create_cob(self, key: str, value: float, txid: str, expiry=900):
-        return self.call("PUT", f"/pix/v2/cob/{txid}", data={
+    def create_cob(self, key: str, value: float, txid: str, name=None, cnpj=None, cpf=None, memo=None, expiry=900):
+        data = {
             "calendario": {
                 "expiracao": expiry
             },
@@ -83,7 +83,39 @@ class Inter:
                 "modalidadeAlteracao": 0
             },
             "chave": key
-        })
-    
+        }
+        if cpf and name:
+            data["devedor"] = {
+                "cpf": cpf,
+                "nome": name
+            }
+        
+        if cnpj and name:
+            data["devedor"] = {
+                "cnpj": cnpj,
+                "nome": name
+            }
+        
+        if memo:
+            data["solicitacaoPagador"] = memo
+        return self.call("PUT", f"/pix/v2/cob/{txid}", data=data)
+
     def get_cob(self, txid: str):
         return self.call("GET", f"/pix/v2/cob/{txid}")
+
+    def pix_refund(self, e2eId: str, txid: str, value: float):
+        data = {
+            "valor": f"{value:,.2f}"
+        }
+        return self.call("PUT", f"/pix/v2/pix/{e2eId}/devolucao/{txid}", data=data)
+
+    def get_history(self, date_start: str, date_end: str, page=0, size=50, type_tx="PIX", type_op="C"):
+        return self.call(
+            "GET", "/banking/v2/extrato/completo", params={
+                "dataInicio": date_start, 
+                "dataFim": date_end,
+                "tipoTransacao": type_tx,
+                "tipoOperacao": type_op,
+                "pagina": page,
+                "tamanhoPagina": size
+        })
