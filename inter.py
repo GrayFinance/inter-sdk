@@ -56,6 +56,9 @@ class Inter:
         return self.__oauth
     
     def call(self, method: str, path: str, data=None, params=None):
+        if time.time() >= self.__oauth.get("expires_in", 0):
+            self.get_token()
+        
         r = requests.request(
             method=method, 
             url=self.__url + path, 
